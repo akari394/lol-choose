@@ -1,0 +1,27 @@
+.right-panel {
+  flex: 1;
+  max-width: 300px;
+  background: #222;
+  padding: 20px;
+  border-radius: 8px;
+  height: fit-content;
+}
+
+.right-panel h2 {
+  text-align: center;
+}
+
+#ranking-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+#ranking-list li {
+  display: flex;
+  align-items: center;
+  background: #333;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}

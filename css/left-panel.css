@@ -1,0 +1,29 @@
+.left-panel {
+  flex: 1;
+  background: #222;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 220px;
+  font-size: 14px;
+}
+
+.left-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+
+.left-panel fieldset {
+  margin-bottom: 0px;
+  padding: 0px;
+}
+
+.left-panel legend {
+  margin-bottom: 0px;
+}
+
+.left-panel label {
+  display: block;
+  margin-bottom: 0px;
+  line-height: 1.2;
+}
