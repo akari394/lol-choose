@@ -44,7 +44,7 @@ export function updateRanking(voteCounts) {
 // 質問の内容
 const questions = [
   {
-    text: "行きたいロールは？",
+    text: "ロール",
     name: "role",
     options: ["ALL", "TOP", "JUG", "MID", "BOT", "SUP"]
   },
