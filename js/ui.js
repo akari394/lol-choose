@@ -1,10 +1,13 @@
-import { getChampionImageURL, championData, loadChampionCSV } from './data.js';
+import { getChampionImageURL, championData } from './data.js';
 
-// 画像を表示する関数
+// ============================================
+// チャンピオン画像を2体表示する関数
+// ============================================
 export function showTwoChampions(leftName, rightName) {
-  const leftImg = document.getElementById('left');
-  const rightImg = document.getElementById('right');
+  const leftImg = document.getElementById('left');   // 左側画像
+  const rightImg = document.getElementById('right'); // 右側画像
 
+  // 画像URLを設定
   leftImg.src = getChampionImageURL(leftName);
   leftImg.alt = leftName;
 
@@ -12,28 +15,35 @@ export function showTwoChampions(leftName, rightName) {
   rightImg.alt = rightName;
 }
 
-// ランキングを表示する関数
+// ============================================
+// ランキング表示の更新
+// voteCounts = { "ChampionEngName": 回数, ... }
+// ============================================
 export function updateRanking(voteCounts) {
   const rankingList = document.getElementById('ranking-list');
-  rankingList.innerHTML = ''; // 現在のランキングをクリア
+  rankingList.innerHTML = ''; // 前回のランキングをクリア
 
-  const sortedChampions = Object.entries(voteCounts)
+  // 選択回数が多い順にソートして上位10体のみ表示
+  const sorted = Object.entries(voteCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  sortedChampions.forEach(([name, count]) => {
+  // ランキングリストに追加
+  sorted.forEach(([engName, count]) => {
     const li = document.createElement('li');
 
+    // チャンピオン画像
     const img = document.createElement('img');
-    img.src = getChampionImageURL(name);
-    img.alt = name;
+    img.src = getChampionImageURL(engName);
+    img.alt = engName;
     img.style.width = '40px';
     img.style.height = '40px';
     img.style.verticalAlign = 'middle';
     img.style.marginRight = '10px';
     img.style.borderRadius = '5px';
 
-    const jaName = championData[name]?.name || name;
+    // 日本語名を取得できれば表示、無ければ英語名
+    const jaName = championData[engName]?.name || engName;
 
     li.appendChild(img);
     li.appendChild(document.createTextNode(`${jaName} — 選択回数: ${count}`));
@@ -41,47 +51,35 @@ export function updateRanking(voteCounts) {
   });
 }
 
-// 質問の内容
+// ============================================
+// 質問フォーム（ラジオボタン）設定
+// ============================================
 const questions = [
-  {
-    text: "ロール",
-    name: "role",
-    options: ["ALL", "TOP", "JUG", "MID", "BOT", "SUP"]
-  },
-//   {
-//     text: "CCはあった方がいい？",
-//     name: "cc",
-//     options: ["なくていい", "あった方がいい", "対象指定がいい"]
-//   },
-//   {
-//     text: "操作難易度",
-//     name: "difficulty",
-//     options: ["簡単", "そこそこ", "難しくても大丈夫"]
-//   }
+  { text: "ロール", name: "role", options: ["ALL", "TOP", "JUG", "MID", "BOT", "SUP"] },
+  { text: "CCはあった方がいい？", name: "cc", options: ["ALL", "なくていい", "ちょっとでいい", "たくさん欲しい"] },
+  // { text: "操作難易度", name: "difficulty", options: ["簡単", "そこそこ", "難しくても大丈夫"] } // 一旦コメントアウト
 ];
 
-// 質問フォームを作成する関数
 export function createQuestionForm() {
   const form = document.createElement('form');
 
+  // 各質問ごとにラベルとラジオボタンを作成
   questions.forEach(q => {
     const p = document.createElement('p');
-    p.textContent = q.text;
+    p.textContent = q.text;  // 質問文
     form.appendChild(p);
 
     q.options.forEach(option => {
       const label = document.createElement('label');
-      label.style.display = 'block';
+      label.style.display = 'block'; // 縦並びに表示
 
       const input = document.createElement('input');
       input.type = 'radio';
-      input.name = q.name;
-      input.value = option;
+      input.name = q.name;    // 質問名
+      input.value = option;   // 選択値
 
-      // `ALL`が最初に選択されるようにchecked属性を追加
-      if (option === 'ALL') {
-        input.checked = true;
-      }
+      // 初期状態でALLを選択
+      if (option === 'ALL') input.checked = true;
 
       label.appendChild(input);
       label.appendChild(document.createTextNode(option));
@@ -89,24 +87,33 @@ export function createQuestionForm() {
     });
   });
 
+  // フォームを左パネルに追加
   const leftPanel = document.querySelector('.left-panel');
-  if (leftPanel) {
-    leftPanel.appendChild(form);
-  }
+  if (leftPanel) leftPanel.appendChild(form);
 }
 
-// ロール変更の監視
+// ============================================
+// ロールラジオボタンの変更監視
+// 引数 onRoleChange: 選択変更時に呼ばれるコールバック関数
+// ============================================
 export function setupRoleChangeListener(onRoleChange) {
-  const roleInputs = document.querySelectorAll('input[name="role"]');
-  roleInputs.forEach(input => {
-    input.addEventListener('change', async (e) => {
+  document.querySelectorAll('input[name="role"]').forEach(input => {
+    input.addEventListener('change', (e) => {
       const selectedRole = e.target.value;
-      console.log('選択されたロール:', selectedRole);
-      
-      await loadChampionCSV(selectedRole); // ロールに対応するCSVを読み込む
-      if (typeof onRoleChange === 'function') {
-        onRoleChange(selectedRole); // onRoleChangeコールバック関数を呼び出し
-      }
+      if (typeof onRoleChange === 'function') onRoleChange(selectedRole);
+    });
+  });
+}
+
+// ============================================
+// CCラジオボタンの変更監視
+// 引数 onCCChange: 選択変更時に呼ばれるコールバック関数
+// ============================================
+export function setupCCChangeListener(onCCChange) {
+  document.querySelectorAll('input[name="cc"]').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const selectedCC = e.target.value;
+      if (typeof onCCChange === 'function') onCCChange(selectedCC);
     });
   });
 }

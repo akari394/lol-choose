@@ -1,67 +1,118 @@
-// data.js
-export const version = "15.17.1";
+// ============================================
+// Data モジュール（チャンピオン情報管理）
+// ============================================
+
+export const version = "15.17.1"; // DragonAPI データバージョン
 export const apiURL = `https://ddragon.leagueoflegends.com/cdn/${version}/data/ja_JP/champion.json`;
 
-export let championsName = [];
-export let championData = {};
-export let currentChampionList = [];
+// チャンピオン名リスト・データ・現在表示対象のチャンピオン
+export let championsName = [];         // 英語IDのリスト
+export let championData = {};          // 英語ID -> チャンピオン情報
+export let currentChampionList = [];   // 日本語名ベース（CSVと同じ表記）
 
-// 投票記録はmain.jsで管理する想定なのでここには入れません
+// 日本語名 -> 英語ID のマップ（モジュール内スコープ）
+let jaToEngMap = {}; 
 
-let jaToEngMap = {};
-
+// ============================================
+// DragonAPI からチャンピオン情報を取得
+// ============================================
 export async function fetchChampionData() {
   try {
-    const response = await fetch(apiURL);
-    const data = await response.json();
-    championData = data.data;
-    championsName = Object.keys(championData);
+    const resp = await fetch(apiURL);
+    const json = await resp.json();
+    championData = json.data;                   // 英語ID -> チャンピオン情報
+    championsName = Object.keys(championData); // 英語IDリスト
 
-    // 日本語名 → 英語IDマップ作成
+    // 日本語名 -> 英語ID の変換マップ作成
     jaToEngMap = {};
     for (const engName in championData) {
       const jaName = championData[engName].name;
       jaToEngMap[jaName] = engName;
     }
 
-    // ★ 初期状態では全チャンピオンを currentChampionList に入れておく
+    // 初期状態では全チャンピオンを currentChampionList に入れる（日本語名）
     currentChampionList = Object.values(championData).map(c => c.name);
-
-  } catch (error) {
-    console.error("チャンピオンデータの取得に失敗しました:", error);
+  } catch (e) {
+    console.error("チャンピオンデータの取得に失敗:", e);
   }
 }
 
-export async function loadChampionCSV(role) {
+// ============================================
+// ロール + CC 条件で currentChampionList を更新
+// role: "ALL" | "TOP" | "JUG" | "MID" | "BOT" | "SUP"
+// ccType: "ALL" | "なくていい" | "ちょっとでいい" | "たくさん欲しい"
+// ============================================
+export async function loadChampionByRoleAndCC(role, ccType) {
   try {
-    if (role === 'ALL') {
-      // 'ALL'が選択された場合は、全チャンピオンリストを設定
-      currentChampionList = Object.values(championData).map(champ => champ.name);
-    } else {
-      const response = await fetch(`./public/${role}.csv`);
-      if (!response.ok) throw new Error('CSVの読み込みに失敗しました');
-      const text = await response.text();
-      currentChampionList = text.trim().split('\n').map(line => line.trim());
+    // まずロールCSVを取得
+    const roleResp = await fetch(`./public/role/${role}.csv`);
+    if (!roleResp.ok) throw new Error(`role CSV 読み込み失敗: ${role}`);
+    let roleList = (await roleResp.text())
+      .trim()
+      .split("\n")
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    // CCがALLでない場合、CC CSVを取得して絞り込み
+    if (ccType !== "ALL") {
+      const ccMap = {
+        "なくていい": "NOCC",
+        "ちょっとでいい": "ONECC",
+        "たくさん欲しい": "AOECC",
+      };
+      const ccFile = ccMap[ccType];
+      const ccResp = await fetch(`./public/cc/${ccFile}.csv`);
+      if (!ccResp.ok) throw new Error(`cc CSV 読み込み失敗: ${ccFile}`);
+      const ccList = (await ccResp.text())
+        .trim()
+        .split("\n")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      // 日本語名ベースで積集合
+      roleList = roleList.filter(name => ccList.includes(name));
     }
-  } catch (error) {
-    console.error('CSV読み込みエラー:', error);
+
+    // 条件に合うチャンピオンだけ currentChampionList にセット
+    currentChampionList = roleList;
+  } catch (e) {
+    console.error("CSV読み込みエラー:", e);
     currentChampionList = [];
   }
 }
 
-export function getTwoRandomChampions() {
-  if (currentChampionList.length < 2) {
-    return [null, null];
-  }
-  const shuffled = currentChampionList.sort(() => 0.5 - Math.random());
+// ============================================
+// 2体のチャンピオンをランダムに選ぶ関数
+// ・選ばれなかった回数が2回以上のチャンピオンは除外
+// ・currentChampionList は日本語名ベース
+// ・voteCounts / appearCounts は英語IDベース
+// ============================================
+export function getTwoRandomChampions(_role, _cc, voteCounts, appearCounts) {
+  // 除外条件を適用
+  const filtered = currentChampionList.filter(jaName => {
+    const eng = jaToEngMap[jaName];            // 日本語名 -> 英語ID
+    if (!eng) return false;                    // 変換できなければ除外
+    const appears = appearCounts?.[eng] || 0;  // 表示された回数
+    const votes = voteCounts?.[eng] || 0;      // 選ばれた回数
+    return (appears - votes) < 2;              // 選ばれなかった回数 < 2 なら残す
+  });
 
-  // 日本語名→英語IDに変換
-  const left = jaToEngMap[shuffled[0]] || null;
-  const right = jaToEngMap[shuffled[1]] || null;
+  if (filtered.length < 2) return [null, null]; // 2体未満ならnull
 
-  return [left, right];
+  // シャッフルして2体選ぶ
+  const shuffled = filtered.slice().sort(() => 0.5 - Math.random());
+  const leftEng = jaToEngMap[shuffled[0]] || null;
+  const rightEng = jaToEngMap[shuffled[1]] || null;
+
+  // 念のため同一除外
+  if (!leftEng || !rightEng || leftEng === rightEng) return [null, null];
+
+  return [leftEng, rightEng];
 }
 
-export function getChampionImageURL(name) {
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${name}.png`;
+// ============================================
+// チャンピオン画像URLを返す
+// ============================================
+export function getChampionImageURL(engName) {
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${engName}.png`;
 }
